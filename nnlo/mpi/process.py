@@ -126,6 +126,7 @@ class MPIProcess(object):
         pass
 
     def save_checkpoint(self):
+        self.epoch_stop_time = time.time()
         if self.checkpoint is not None and self.epoch % self.checkpoint_interval == 0:
             file_name = '{}-{}'.format(self.checkpoint, self.epoch)
             logging.info("Checkpointing to {}".format( file_name ))
@@ -135,8 +136,14 @@ class MPIProcess(object):
             if self.algo:
                 self.algo.save(file_name + '.algo')
 
+            out_dict = { "epoch_time" : self.epoch_stop_time - self.epoch_start_time, "history" : self.histories}
+
+            with open( file_name + '.history', 'w') as out_file:
+                out_file.write( json.dumps(out_dict, indent=4, separators=(',',': ')) )
+
             with open(self.checkpoint + '.latest', 'w') as latest:
                 latest.write(file_name)
+        self.epoch_start_time = time.time()
 
     def history_key(self):
         #return str(self.rank)
@@ -783,6 +790,7 @@ class MPIMaster(MPIProcess):
         """
         Timeline.begin("train")
         self.start_time = time.time()
+        self.epoch_start_time = time.time()
         self.check_sanity()
         self.bcast_weights( comm=self.child_comm )
         self.signal_children()
